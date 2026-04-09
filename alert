@@ -1,0 +1,47 @@
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+SMTP_SERVER = None
+SMTP_PORT = None
+SMTP_USER = None
+SMTP_PASSWORD = None
+FROM_EMAIL = None
+
+def configure_alerts(server=None, port=None, user=None, password=None, from_email=None):
+    global SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, FROM_EMAIL
+    SMTP_SERVER = server
+    SMTP_PORT = port
+    SMTP_USER = user
+    SMTP_PASSWORD = password
+    FROM_EMAIL = from_email or user
+
+def send_email_alert(to_email, subject, body):
+    if not SMTP_SERVER or not SMTP_USER:
+        return False
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = FROM_EMAIL
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT or 587) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Email alert failed: {e}")
+        return False
+
+def create_alert_message(status, metric_name, value):
+    if status == 'Critical':
+        return f"CRITICAL ALERT: Your {metric_name} is at {value}. Please seek immediate medical attention."
+    elif status == 'Warning':
+        return f"Warning: Your {metric_name} is at {value}. Please monitor and consult a doctor if it persists."
+    return None
+
+def should_send_email_alert(status):
+    return status == 'Critical'
