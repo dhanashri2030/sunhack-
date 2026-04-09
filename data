@@ -1,0 +1,100 @@
+import random
+
+last_hr = 72
+
+def generate_simulation():
+    global last_hr
+
+    rand = random.random()
+
+    if rand < 0.70:
+        hr = last_hr + random.randint(-5, 5)
+        hr = max(60, min(100, hr))
+        spo2 = random.randint(96, 100)
+        temp = round(random.uniform(36.2, 37.4), 1)
+        bp_sys = random.randint(100, 120)
+        bp_dia = random.randint(65, 80)
+    elif rand < 0.90:
+        metrics = ['hr_high', 'hr_low', 'spo2', 'temp', 'bp']
+        trigger = random.choice(metrics)
+
+        if trigger == 'hr_high':
+            hr = random.randint(105, 120)
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        elif trigger == 'hr_low':
+            hr = random.randint(52, 58)
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        elif trigger == 'spo2':
+            hr = last_hr + random.randint(-3, 3)
+            hr = max(60, min(100, hr))
+            spo2 = random.randint(90, 94)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        elif trigger == 'temp':
+            hr = last_hr + random.randint(-3, 3)
+            hr = max(60, min(100, hr))
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(37.6, 38.4), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        else:
+            hr = last_hr + random.randint(-3, 3)
+            hr = max(60, min(100, hr))
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(125, 140)
+            bp_dia = random.randint(80, 90)
+    else:
+        metrics = ['hr_critical_high', 'hr_critical_low', 'spo2_critical', 'temp_critical', 'bp_critical']
+        trigger = random.choice(metrics)
+
+        if trigger == 'hr_critical_high':
+            hr = random.randint(125, 140)
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        elif trigger == 'hr_critical_low':
+            hr = random.randint(42, 48)
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        elif trigger == 'spo2_critical':
+            hr = last_hr + random.randint(-5, 5)
+            hr = max(70, min(110, hr))
+            spo2 = random.randint(84, 89)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        elif trigger == 'temp_critical':
+            hr = last_hr + random.randint(-3, 3)
+            hr = max(60, min(100, hr))
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(38.6, 39.5), 1)
+            bp_sys = random.randint(100, 120)
+            bp_dia = random.randint(65, 80)
+        else:
+            hr = last_hr + random.randint(-3, 3)
+            hr = max(60, min(100, hr))
+            spo2 = random.randint(96, 100)
+            temp = round(random.uniform(36.2, 37.4), 1)
+            bp_sys = random.randint(145, 160)
+            bp_dia = random.randint(95, 105)
+
+    last_hr = hr
+
+    return {
+        'heart_rate': hr,
+        'spo2': spo2,
+        'temperature': temp,
+        'bp_sys': bp_sys,
+        'bp_dia': bp_dia
+    }
