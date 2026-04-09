@@ -1,0 +1,303 @@
+import sqlite3
+import os
+from datetime import datetime
+
+DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'vitalguard.db')
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            phone TEXT,
+            age INTEGER,
+            gender TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS health_readings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            heart_rate INTEGER,
+            spo2 INTEGER,
+            temperature REAL,
+            blood_pressure_sys INTEGER,
+            blood_pressure_dia INTEGER,
+            status TEXT,
+            risk_score INTEGER,
+            ai_message TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS emergency_contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            relationship TEXT,
+            phone TEXT,
+            email TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            type TEXT,
+            message TEXT,
+            is_read INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            used INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+# User functions
+def create_user(name, email, password_hash, phone=None, age=None, gender=None):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            'INSERT INTO users (name, email, password_hash, phone, age, gender) VALUES (?, ?, ?, ?, ?, ?)',
+            (name, email, password_hash, phone, age, gender)
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        conn.close()
+        return user_id
+    except sqlite3.IntegrityError:
+        conn.close()
+        return None
+
+def get_user_by_email(email):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+def get_user_by_id(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+def update_user(user_id, name=None, phone=None, age=None, gender=None):
+    conn = get_db()
+    cursor = conn.cursor()
+    updates = []
+    params = []
+    if name:
+        updates.append('name = ?')
+        params.append(name)
+    if phone:
+        updates.append('phone = ?')
+        params.append(phone)
+    if age:
+        updates.append('age = ?')
+        params.append(age)
+    if gender:
+        updates.append('gender = ?')
+        params.append(gender)
+    params.append(user_id)
+    cursor.execute(f'UPDATE users SET {", ".join(updates)} WHERE id = ?', params)
+    conn.commit()
+    conn.close()
+
+# Session functions
+def create_session(user_id, token):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO sessions (user_id, token) VALUES (?, ?)', (user_id, token))
+    conn.commit()
+    conn.close()
+
+def get_session(token):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM sessions WHERE token = ?', (token,))
+    session = cursor.fetchone()
+    conn.close()
+    return session
+
+def delete_session(token):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM sessions WHERE token = ?', (token,))
+    conn.commit()
+    conn.close()
+
+def create_password_reset(user_id, token, expires_at):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM password_resets WHERE user_id = ?', (user_id,))
+    cursor.execute(
+        'INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
+        (user_id, token, expires_at)
+    )
+    conn.commit()
+    conn.close()
+
+def get_password_reset(token):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM password_resets WHERE token = ? AND used = 0', (token,))
+    reset = cursor.fetchone()
+    conn.close()
+    return reset
+
+def mark_password_reset_used(token):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE password_resets SET used = 1 WHERE token = ?', (token,))
+    conn.commit()
+    conn.close()
+
+def update_user_password(user_id, password_hash):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE users SET password_hash = ? WHERE id = ?', (password_hash, user_id))
+    conn.commit()
+    conn.close()
+
+# Health reading functions
+def save_health_reading(user_id, heart_rate, spo2, temperature, bp_sys, bp_dia, status, risk_score, ai_message):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO health_readings (user_id, heart_rate, spo2, temperature, blood_pressure_sys, blood_pressure_dia, status, risk_score, ai_message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (user_id, heart_rate, spo2, temperature, bp_sys, bp_dia, status, risk_score, ai_message))
+    conn.commit()
+    reading_id = cursor.lastrowid
+    conn.close()
+    return reading_id
+
+def get_latest_reading(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM health_readings WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1', (user_id,))
+    reading = cursor.fetchone()
+    conn.close()
+    return reading
+
+def get_reading_history(user_id, limit=20):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM health_readings WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?', (user_id, limit))
+    readings = cursor.fetchall()
+    conn.close()
+    return readings
+
+# Emergency contact functions
+def add_emergency_contact(user_id, name, relationship, phone, email=None):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO emergency_contacts (user_id, name, relationship, phone, email) VALUES (?, ?, ?, ?, ?)',
+        (user_id, name, relationship, phone, email)
+    )
+    conn.commit()
+    contact_id = cursor.lastrowid
+    conn.close()
+    return contact_id
+
+def get_emergency_contacts(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM emergency_contacts WHERE user_id = ?', (user_id,))
+    contacts = cursor.fetchall()
+    conn.close()
+    return contacts
+
+def delete_emergency_contact(contact_id, user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM emergency_contacts WHERE id = ? AND user_id = ?', (contact_id, user_id))
+    conn.commit()
+    conn.close()
+
+# Alert functions
+def create_alert(user_id, alert_type, message):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO alerts (user_id, type, message) VALUES (?, ?, ?)',
+        (user_id, alert_type, message)
+    )
+    conn.commit()
+    alert_id = cursor.lastrowid
+    conn.close()
+    return alert_id
+
+def get_unread_alerts(user_id, limit=5):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM alerts WHERE user_id = ? AND is_read = 0 ORDER BY timestamp DESC LIMIT ?', (user_id, limit))
+    alerts = cursor.fetchall()
+    conn.close()
+    return alerts
+
+def get_all_alerts(user_id, limit=10):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM alerts WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?', (user_id, limit))
+    alerts = cursor.fetchall()
+    conn.close()
+    return alerts
+
+def mark_alert_read(alert_id, user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE alerts SET is_read = 1 WHERE id = ? AND user_id = ?', (alert_id, user_id))
+    conn.commit()
+    conn.close()
+
+def mark_all_alerts_read(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE alerts SET is_read = 1 WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
