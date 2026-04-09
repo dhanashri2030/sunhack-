@@ -1,0 +1,114 @@
+import random
+import math
+
+def classify_heart_rate(hr):
+    if hr is None:
+        return 'Warning', 12
+    if hr > 120 or hr < 50:
+        return 'Critical', 25
+    if hr > 100 or hr < 60:
+        return 'Warning', 12
+    return 'Normal', 0
+
+def classify_spo2(spo2):
+    if spo2 is None:
+        return 'Warning', 12
+    if spo2 < 90:
+        return 'Critical', 25
+    if spo2 < 95:
+        return 'Warning', 12
+    return 'Normal', 0
+
+def classify_temperature(temp):
+    if temp is None:
+        return 'Warning', 12
+    if temp > 38.5 or temp < 35:
+        return 'Critical', 25
+    if temp > 37.5 or temp < 36.1:
+        return 'Warning', 12
+    return 'Normal', 0
+
+def classify_blood_pressure(sys):
+    if sys is None:
+        return 'Warning', 12
+    if sys > 140 or sys < 90:
+        return 'Critical', 25
+    if sys > 120:
+        return 'Warning', 12
+    return 'Normal', 0
+
+def analyze_health_data(heart_rate, spo2, temperature, bp_sys, bp_dia):
+    hr_status, hr_pts = classify_heart_rate(heart_rate)
+    spo2_status, spo2_pts = classify_spo2(spo2)
+    temp_status, temp_pts = classify_temperature(temperature)
+    bp_status, bp_pts = classify_blood_pressure(bp_sys)
+
+    total_risk = hr_pts + spo2_pts + temp_pts + bp_pts
+    risk_score = min(total_risk, 100)
+
+    statuses = [hr_status, spo2_status, temp_status, bp_status]
+    if 'Critical' in statuses:
+        overall_status = 'Critical'
+    elif 'Warning' in statuses:
+        overall_status = 'Warning'
+    else:
+        overall_status = 'Normal'
+
+    ai_message = generate_ai_message(hr_status, spo2_status, temp_status, bp_status, overall_status)
+
+    return {
+        'status': overall_status,
+        'risk_score': risk_score,
+        'ai_message': ai_message,
+        'metrics': {
+            'heart_rate': {'status': hr_status, 'points': hr_pts},
+            'spo2': {'status': spo2_status, 'points': spo2_pts},
+            'temperature': {'status': temp_status, 'points': temp_pts},
+            'blood_pressure': {'status': bp_status, 'points': bp_pts}
+        }
+    }
+
+def generate_ai_message(hr_status, spo2_status, temp_status, bp_status, overall_status):
+    messages = []
+
+    if hr_status == 'Critical':
+        messages.append("Your heart rate is critically abnormal. Consider seeking immediate medical attention.")
+    elif hr_status == 'Warning':
+        messages.append("Your heart rate is slightly elevated or low. Monitor closely and rest.")
+
+    if spo2_status == 'Critical':
+        messages.append("Your blood oxygen is dangerously low. This requires immediate evaluation.")
+    elif spo2_status == 'Warning':
+        messages.append("Your blood oxygen is below normal. Try deep breathing exercises.")
+
+    if temp_status == 'Critical':
+        messages.append("You have a high fever. Consider taking fever-reducing medication and hydrating.")
+    elif temp_status == 'Warning':
+        messages.append("Your temperature is slightly elevated. Monitor for symptoms.")
+
+    if bp_status == 'Critical':
+        messages.append("Your blood pressure is dangerously high. Consult a healthcare provider immediately.")
+    elif bp_status == 'Warning':
+        messages.append("Your blood pressure is mildly elevated. Reduce sodium intake and stress.")
+
+    if overall_status == 'Normal':
+        return "All vital signs are within normal ranges. Keep up the healthy lifestyle!"
+
+    return " ".join(messages) if messages else "Some readings need attention. Please consult your doctor."
+
+def calculate_anomaly_score(heart_rate, spo2, temperature, bp_sys):
+    score = 0.0
+
+    hr_z = abs(heart_rate - 75) / 25 if heart_rate else 0
+    score += min(hr_z * 15, 25)
+
+    spo2_z = (95 - spo2) / 5 if spo2 and spo2 < 95 else 0
+    score += min(spo2_z * 20, 25)
+
+    temp_z = abs(temperature - 36.8) / 0.8 if temperature else 0
+    score += min(temp_z * 15, 25)
+
+    bp_z = abs(bp_sys - 110) / 20 if bp_sys else 0
+    score += min(bp_z * 12.5, 25)
+
+    return min(score, 100)
